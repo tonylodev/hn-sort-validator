@@ -4,7 +4,7 @@
 
 **Automated QA check for Hacker News ordering, built with Playwright**
 
-[![Unit tests](https://github.com/tonytheg/hn-sort-validator/actions/workflows/test.yml/badge.svg)](https://github.com/tonytheg/hn-sort-validator/actions/workflows/test.yml)
+[![Unit tests](https://github.com/tonylodev/hn-sort-validator/actions/workflows/test.yml/badge.svg)](https://github.com/tonylodev/hn-sort-validator/actions/workflows/test.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Playwright](https://img.shields.io/badge/Playwright-browser_automation-2EAD33?style=flat-square&logo=playwright)](https://playwright.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
@@ -34,7 +34,7 @@ produce a non-zero process exit code.
 ### Install
 
 ```bash
-git clone https://github.com/tonytheg/hn-sort-validator.git
+git clone https://github.com/tonylodev/hn-sort-validator.git
 cd hn-sort-validator
 npm ci
 npx playwright install chromium
