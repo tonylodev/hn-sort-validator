@@ -12,6 +12,7 @@ const REQUIRED_ARTICLE_COUNT = 100;
 const PAGINATION_DELAY_MS = 5000;
 const RATE_LIMIT_RETRY_MS = 30000;
 const MAX_NAVIGATION_ATTEMPTS = 4;
+const MAX_COLLECTION_PAGES = 10;
 
 async function navigateWithRetry(
   page,
@@ -109,33 +110,62 @@ function appendUniqueArticles(
   }
 }
 
+async function collectHackerNewsArticles(
+  page,
+  { paginationDelayMs = PAGINATION_DELAY_MS, maxPages = MAX_COLLECTION_PAGES } = {}
+) {
+  if (!Number.isInteger(maxPages) || maxPages < 1) {
+    throw new TypeError("Maximum page count must be a positive integer.");
+  }
+  if (!Number.isFinite(paginationDelayMs) || paginationDelayMs < 0) {
+    throw new TypeError("Pagination delay must be a non-negative number.");
+  }
+
+  const articles = [];
+  const seenArticleIds = new Set();
+  const visitedUrls = new Set();
+  let nextUrl = "https://news.ycombinator.com/newest";
+
+  for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
+    visitedUrls.add(nextUrl);
+    await navigateWithRetry(page, nextUrl);
+    const currentUrl = new URL(page.url());
+    currentUrl.hash = "";
+    visitedUrls.add(currentUrl.href);
+
+    const previousCount = articles.length;
+    appendUniqueArticles(articles, await readArticleRows(page), seenArticleIds);
+    if (articles.length === REQUIRED_ARTICLE_COUNT) return articles;
+    if (articles.length === previousCount) {
+      throw new Error("Hacker News pagination returned no new unique articles.");
+    }
+
+    const moreLink = await page.$("a.morelink");
+    const href = await moreLink?.getAttribute("href");
+    if (!href) return articles;
+
+    if (pageNumber === maxPages) {
+      throw new Error(
+        `Hacker News collection exceeded ${maxPages} pages before collecting ${REQUIRED_ARTICLE_COUNT} unique articles.`
+      );
+    }
+    const moreUrl = new URL(href, page.url());
+    moreUrl.hash = "";
+    nextUrl = moreUrl.href;
+    if (visitedUrls.has(nextUrl)) {
+      throw new Error("Hacker News pagination repeated a page URL.");
+    }
+    await page.waitForTimeout(paginationDelayMs);
+  }
+}
+
 async function sortHackerNewsArticles({ headless = true, openReport = false } = {}) {
   const browser = await chromium.launch({ headless });
 
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await navigateWithRetry(page, "https://news.ycombinator.com/newest");
-
-    const articles = [];
-    const seenArticleIds = new Set();
-
-    while (articles.length < REQUIRED_ARTICLE_COUNT) {
-      const pageArticles = await readArticleRows(page);
-      appendUniqueArticles(articles, pageArticles, seenArticleIds);
-
-      if (articles.length < REQUIRED_ARTICLE_COUNT) {
-        const moreLink = await page.$("a.morelink");
-        if (!moreLink) break;
-
-        const href = await moreLink.getAttribute("href");
-        if (!href) break;
-
-        await page.waitForTimeout(PAGINATION_DELAY_MS);
-        await navigateWithRetry(page, new URL(href, page.url()).href);
-      }
-    }
-
+    const articles = await collectHackerNewsArticles(page);
     console.log(`Collected ${articles.length} unique articles.\n`);
 
     const validation = evaluateValidationRun(articles, REQUIRED_ARTICLE_COUNT);
@@ -338,6 +368,7 @@ if (require.main === module) {
 module.exports = {
   appendUniqueArticles,
   buildReport,
+  collectHackerNewsArticles,
   navigateWithRetry,
   readArticleRows,
   sortHackerNewsArticles,

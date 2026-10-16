@@ -70,6 +70,12 @@ HTTP 429 responses trigger a 30-second wait between attempts, with a bounded
 maximum of four navigation attempts. Other unsuccessful HTTP responses fail
 immediately with a clear status message.
 
+Collection stops with an error if a pagination URL repeats, a page adds no new
+unique articles, or ten pages are exhausted before reaching 100 articles. These
+guards bound unattended runs when a feed stalls or its pagination changes.
+If the feed ends normally before 100 articles, the report records a failed,
+incomplete collection.
+
 ## Report output
 
 The generated report contains:
@@ -99,15 +105,30 @@ The offline Node test suite covers:
 - safe URL handling and HTML escaping; and
 - generated report content and file output.
 
-GitHub Actions runs the suite on Node.js 20 and 24 for every push and pull
-request. The live scrape remains a separate integration check because it
-depends on the current Hacker News site and its rate limits.
+Run the Chromium integration suite after installing the browser:
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+These tests exercise the actual scraper against synthetic HN-shaped HTML in a
+real browser. Every browser request is intercepted; no live Hacker News content
+is fetched. Coverage includes DOM extraction, overlapping pages, a cyclic
+`More` link, duplicate-only pages, the page limit, an incomplete feed, and
+malformed timestamps or missing IDs.
+
+GitHub Actions runs the unit suite on Node.js 20 and 24 for every push and pull
+request. Run the browser fixture suite locally when changing DOM extraction or
+pagination. The live scrape remains a separate check because it depends on the
+current Hacker News site and its rate limits.
 
 ## Project structure
 
 ```text
 hn-sort-validator/
-├── .github/workflows/test.yml  # Node.js CI matrix
+├── .github/workflows/test.yml  # Node.js unit-test CI matrix
+├── integration/                # Browser tests using synthetic HTML fixtures
 ├── lib/validation.js           # Parsing, ordering, and output-safety helpers
 ├── test/                       # Offline navigation, validation, and report tests
 ├── .gitignore                  # Generated report exclusion
@@ -125,8 +146,12 @@ hn-sort-validator/
   counting one submission twice across pages.
 - **Bounded retries:** transient rate limiting is handled without allowing an
   unattended run to wait forever.
+- **Bounded pagination:** repeated URLs, stalled collection, and a ten-page
+  ceiling prevent an endless scrape even when navigation itself succeeds.
 - **Offline unit tests:** core ordering, retry, deduplication, and report logic
   can be verified without a browser or network connection.
+- **Browser fixture tests:** the DOM selectors and pagination flow are exercised
+  reproducibly without depending on the live feed.
 
 ## License
 

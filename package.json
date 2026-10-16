@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "node --test",
+    "test:browser": "node --test integration/scraper.browser.cjs",
     "validate": "node index.js",
     "validate:headed": "node index.js --headed --open-report"
   },
